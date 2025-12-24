@@ -116,6 +116,12 @@
 
           echo -e "Packages:\n${packagesDisplay}"
 
+          # CI mode: set up PATH for GitHub Actions and exit
+          if [ "''${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "$bin_paths" | tr ':' '\n' >> "$GITHUB_PATH"
+            exit 0
+          fi
+
           export IN_NIX_SHELL=impure
           export name="${name}"
           export PATH="$bin_paths:$PATH"
