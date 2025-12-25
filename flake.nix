@@ -1,7 +1,5 @@
 {
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-
-  outputs = {nixpkgs, ...}: let
+  outputs = {...}: let
     defaultSystems = [
       "aarch64-darwin"
       "x86_64-darwin"
@@ -167,7 +165,7 @@
         systems);
 
     # Helper to generate for all systems (for simple per-system outputs)
-    forAllSystems = f:
+    forAllSystems = nixpkgs: f:
       builtins.listToAttrs (map (system: {
           name = system;
           value = f nixpkgs.legacyPackages.${system};
@@ -175,27 +173,5 @@
         defaultSystems);
   in {
     lib = {inherit mkDevshell toPackages forAllSystems;};
-
-    packages = toPackages {
-      python = mkDevshell {
-        inherit nixpkgs;
-        packagesFor = pkgs: with pkgs; [uv ruff];
-      };
-
-      custom = mkDevshell {
-        inherit nixpkgs;
-        packagesFor = pkgs:
-          with pkgs; [
-            jq
-            curl
-            (writeShellScriptBin "hello" ''echo "Hello from custom devshell!"'')
-            (writeShellScriptBin "git-status" ''${git}/bin/git status --short "$@"'')
-          ];
-        caches = [
-          "https://cache.nixos.org"
-          "https://buurro.cachix.org"
-        ];
-      };
-    };
   };
 }
