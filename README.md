@@ -28,7 +28,10 @@ The generated script works on all architectures: `aarch64-darwin`, `x86_64-darwi
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    quickshell.url = "github:buurro/quickshell";
+    quickshell = {
+      url = "github:buurro/quickshell";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = { nixpkgs, quickshell, ... }: {
