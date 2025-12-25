@@ -21,13 +21,12 @@
     mkDevshell = {
       nixpkgs,
       packagesFor,
-      scriptPath ? "scripts/devshell.sh",
       caches ? ["https://cache.nixos.org"],
       systems ? defaultSystems,
     }: {
       # Store config for toPackages to use
       _type = "quickshell";
-      _config = {inherit nixpkgs packagesFor scriptPath caches systems;};
+      _config = {inherit nixpkgs packagesFor caches systems;};
     };
 
     # Convert devshell definitions to flake packages
@@ -60,8 +59,6 @@
           map (p: "  ${p}") perSystem.${firstSystem}.packageInfo
         );
 
-        scriptDir = builtins.dirOf cfg.scriptPath;
-
         caseBranches = builtins.concatStringsSep "\n" (map (system: let
           info = perSystem.${system};
           uname = systemToUname.${system};
@@ -84,11 +81,11 @@
             fi
           done
           if [ ''${#missing[@]} -gt 0 ]; then
-            echo "ERROR: Missing packages not found in any cache:"
-            printf '  %s\n' "''${missing[@]}"
-            echo ""
-            echo "Build with: nix build .#${name}"
-            echo "Then push:  nix copy --to <cache-url> .#${name}"
+            echo "ERROR: Missing packages not found in any cache:" >&2
+            printf '  %s\n' "''${missing[@]}" >&2
+            echo "" >&2
+            echo "Build with: nix build .#${name}" >&2
+            echo "Then push:  nix copy --to <cache-url> .#${name}" >&2
             exit 1
           fi
         '';
@@ -96,8 +93,7 @@
         scriptContent = ''
           #!/usr/bin/env bash
 
-          # This file is auto-generated - do not edit manually
-          # Regenerate with: nix run .#${name}
+          # Generated with: nix run .#${name}
 
           set -euo pipefail
 
@@ -132,17 +128,11 @@
         mkSystemOutputs = system: let
           info = perSystem.${system};
 
-          # Create the generator script
+          # Create the generator script (prints to stdout)
           generatorScript = info.pkgs.writeShellScript "generate-${name}-script" ''
-            mkdir -p ${scriptDir}
-
-            cat > ${cfg.scriptPath} << 'EOF'
+            cat << 'EOF'
             ${scriptContent}
             EOF
-
-            chmod +x ${cfg.scriptPath}
-
-            echo "Generated ${cfg.scriptPath}"
           '';
 
           # Create a package that:
@@ -189,13 +179,11 @@
     packages = toPackages {
       python = mkDevshell {
         inherit nixpkgs;
-        scriptPath = "scripts/python.sh";
         packagesFor = pkgs: with pkgs; [uv ruff];
       };
 
       custom = mkDevshell {
         inherit nixpkgs;
-        scriptPath = "scripts/custom.sh";
         packagesFor = pkgs:
           with pkgs; [
             jq
