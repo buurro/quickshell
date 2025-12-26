@@ -54,8 +54,6 @@
         systems = cfg.systems or defaultSystems;
         comment = sanitizeComment (cfg.comment or "");
 
-        paths = map (p: builtins.unsafeDiscardStringContext (toString p)) packages;
-        binPaths = builtins.concatStringsSep ":" (map (p: "${p}/bin") paths);
         pkgInfo = map (p: escapeForBash "${p.pname or p.name} ${p.version or ""}") packages;
 
         caseBranches = builtins.concatStringsSep "\n" (map (sys: let
