@@ -21,10 +21,11 @@
       packagesFor,
       caches ? ["https://cache.nixos.org"],
       systems ? defaultSystems,
+      comment ? "",
     }: {
       # Store config for toPackages to use
       _type = "quickshell";
-      _config = {inherit nixpkgs packagesFor caches systems;};
+      _config = {inherit nixpkgs packagesFor caches systems comment;};
     };
 
     # Convert devshell definitions to flake packages
@@ -53,10 +54,6 @@
           cfg.systems);
 
         firstSystem = builtins.head cfg.systems;
-        packagesDisplay = builtins.concatStringsSep "\\n" (
-          map (p: "  ${p}") perSystem.${firstSystem}.packageInfo
-        );
-
         caseBranches = builtins.concatStringsSep "\n" (map (system: let
           info = perSystem.${system};
           uname = systemToUname.${system};
@@ -81,17 +78,30 @@
           if [ ''${#missing[@]} -gt 0 ]; then
             echo "ERROR: Missing packages not found in any cache:" >&2
             printf '  %s\n' "''${missing[@]}" >&2
-            echo "" >&2
-            echo "Build with: nix build .#${name}" >&2
-            echo "Then push:  nix copy --to <cache-url> .#${name}" >&2
             exit 1
           fi
         '';
 
+        # Sanitize comment: split lines and prefix each with #
+        # This prevents injection even if comment contains newlines or special chars
+        sanitizedComment =
+          if cfg.comment != ""
+          then let
+            # builtins.split returns interleaved [string, match, string, match, ...]
+            # Filter to keep only strings (non-lists)
+            lines = builtins.filter builtins.isString (builtins.split "\n" cfg.comment);
+            cleanLines = map (line: builtins.replaceStrings ["\r"] [""] line) lines;
+          in
+            builtins.concatStringsSep "\n" (map (line: "# ${line}") cleanLines) + "\n"
+          else "";
+
         scriptContent = ''
           #!/usr/bin/env bash
 
-          # Generated with: nix run .#${name}
+          ${sanitizedComment}
+          PACKAGES="
+          ${builtins.concatStringsSep "\n" perSystem.${firstSystem}.packageInfo}
+          "
 
           set -euo pipefail
 
@@ -108,7 +118,7 @@
 
           ${missingCheck}
 
-          echo -e "Packages:\n${packagesDisplay}"
+          echo "Packages:$PACKAGES"
 
           # CI mode: set up PATH for GitHub Actions and exit
           if [ "''${GITHUB_ACTIONS:-}" = "true" ]; then
