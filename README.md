@@ -32,15 +32,12 @@ The generated script works on all architectures: `aarch64-darwin`, `x86_64-darwi
   };
 
   outputs = { nixpkgs, quickshell, ... }: {
-    packages = quickshell.lib.toPackages {
-      dev = quickshell.lib.mkDevshell {
-        inherit nixpkgs;
-        packagesFor = pkgs: with pkgs; [
-          nodejs
-          python3
-          jq
-        ];
-      };
+    packages = quickshell.lib.mkPackages nixpkgs {
+      dev = pkgs: with pkgs; [
+        nodejs
+        python3
+        jq
+      ];
     };
   };
 }
@@ -60,27 +57,36 @@ nix shell .#dev                  # Use packages directly via nix
 ## Multiple shells
 
 ```nix
-packages = quickshell.lib.toPackages {
-  dev = quickshell.lib.mkDevshell {
-    inherit nixpkgs;
-    packagesFor = pkgs: with pkgs; [ nodejs python3 ];
-  };
-
-  frontend = quickshell.lib.mkDevshell {
-    inherit nixpkgs;
-    packagesFor = pkgs: with pkgs; [ nodejs pnpm ];
-  };
+packages = quickshell.lib.mkPackages nixpkgs {
+  dev = pkgs: with pkgs; [ nodejs python3 ];
+  frontend = pkgs: with pkgs; [ nodejs pnpm ];
 };
 ```
 
 ## Options
 
-| Option        | Required | Default                       | Description                      |
-| ------------- | -------- | ----------------------------- | -------------------------------- |
-| `nixpkgs`     | yes      | -                             | The nixpkgs flake input          |
-| `packagesFor` | yes      | -                             | Function: `pkgs -> [ packages ]` |
-| `caches`      | no       | `["https://cache.nixos.org"]` | Binary caches to fetch from      |
-| `systems`     | no       | all 4 systems                 | Which architectures to support   |
+For simple cases, each shell is just a function `pkgs -> [ packages ]`.
+
+For advanced options, use an attrset:
+
+```nix
+packages = quickshell.lib.mkPackages nixpkgs {
+  dev = {
+    packages = pkgs: with pkgs; [ nodejs python3 ];
+    caches = [ "s3://my-bucket" "https://cache.nixos.org" ];
+    systems = [ "x86_64-linux" "aarch64-linux" ];  # linux only
+    nixpkgs = other-nixpkgs;  # override nixpkgs for this shell
+  };
+};
+```
+
+| Option     | Required | Default                       | Description                       |
+| ---------- | -------- | ----------------------------- | --------------------------------- |
+| `packages` | yes      | -                             | Function: `pkgs -> [ packages ]`  |
+| `caches`   | no       | `["https://cache.nixos.org"]` | Binary caches to fetch from       |
+| `systems`  | no       | all 4 systems                 | Which architectures to support    |
+| `nixpkgs`  | no       | inherited from `mkPackages`   | Override nixpkgs for this shell   |
+| `comment`  | no       | `""`                          | Comment added to generated script |
 
 ## Custom packages / private caches
 
@@ -88,18 +94,19 @@ For packages not in cache.nixos.org, push them to your own cache:
 
 ```bash
 nix build .#dev
-nix copy --to https://my-cache.cachix.org .#dev
+nix copy --to s3://my-bucket .#dev
 ```
 
 Then add your cache:
 
 ```nix
-dev = quickshell.lib.mkDevshell {
-  inherit nixpkgs;
-  packagesFor = pkgs: [ pkgs.my-custom-package ];
-  caches = [
-    "https://cache.nixos.org"
-    "https://my-cache.cachix.org"
-  ];
+packages = quickshell.lib.mkPackages nixpkgs {
+  dev = {
+    packages = pkgs: [ pkgs.my-custom-package ];
+    caches = [
+      "https://cache.nixos.org"
+      "s3://my-bucket"
+    ];
+  };
 };
 ```

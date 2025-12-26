@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: DeterminateSystems/nix-installer-action@main
+
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Check formatting (alejandra)
+        run: nix run nixpkgs#alejandra -- --check .
+
+      - name: Check flake evaluates
+        run: nix flake check
+
+  test-template:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: DeterminateSystems/nix-installer-action@main
+
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Test template builds
+        run: |
+          cd templates/default
+          nix flake check
+          nix build .#dev
+          nix build .#with-comment
+          nix build .#with-multiline-comment
+          nix build .#with-dangerous-comment
+          nix build .#ci || true  # ci is linux-only
+
+      - name: Test script generation
+        run: |
+          cd templates/default
+          nix run .#dev > /tmp/dev.sh
+          echo "--- dev script ---"
+          head -20 /tmp/dev.sh
+          grep -q '#!/usr/bin/env bash' /tmp/dev.sh
+          grep -q 'jq' /tmp/dev.sh
+
+      - name: Test comment feature
+        run: |
+          cd templates/default
+
+          # Test single-line comment
+          nix run .#with-comment > /tmp/with-comment.sh
+          echo "--- with-comment script ---"
+          head -10 /tmp/with-comment.sh
+          grep -q '# This is a dev environment' /tmp/with-comment.sh
+
+          # Test multiline comment
+          nix run .#with-multiline-comment > /tmp/multiline.sh
+          echo "--- multiline comment script ---"
+          head -10 /tmp/multiline.sh
+          grep -q '# Development environment' /tmp/multiline.sh
+          grep -q '# Created by quickshell' /tmp/multiline.sh
+
+          # Test dangerous characters are safely commented
+          nix run .#with-dangerous-comment > /tmp/dangerous.sh
+          echo "--- dangerous comment script ---"
+          head -10 /tmp/dangerous.sh
+          # These should appear as comments, not executed
+          grep -q '# Test: \$(whoami)' /tmp/dangerous.sh
+          grep -q "# Quotes:" /tmp/dangerous.sh
+
+          # Verify the script is valid bash (no syntax errors)
+          bash -n /tmp/dangerous.sh
+          echo "All comment tests passed!"
