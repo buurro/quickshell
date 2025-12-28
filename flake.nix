@@ -124,12 +124,14 @@
         packages = cfg.packages pkgs;
         script = mkScript name cfg system;
         scriptFile = pkgs.writeText "${name}-script" script;
-        generator = pkgs.writeShellScript "generate-${name}" "cat ${scriptFile}";
       in
         pkgs.symlinkJoin {
           inherit name;
           paths = packages;
-          postBuild = "cp ${generator} $out/bin/${name}";
+          postBuild = ''
+            cp ${scriptFile} $out/bin/${name}
+            chmod +x $out/bin/${name}
+          '';
           meta.mainProgram = name;
         };
     in

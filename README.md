@@ -16,7 +16,7 @@ Generate standalone, multi-arch shell scripts that fetch packages from binary ca
 ## How it works
 
 1. You define packages in a flake
-2. Run `nix run .#dev > scripts/dev.sh` to generate a bash script
+2. Run `nix build .#dev && cp result/bin/dev dev.sh` to generate a bash script
 3. The script fetches pre-built packages from binary caches and sets up your shell
 4. Commit the script - anyone with Nix can use it instantly
 
@@ -46,12 +46,12 @@ The generated script works on all architectures: `aarch64-darwin`, `x86_64-darwi
 Then:
 
 ```bash
-nix run .#dev                    # Print script to stdout
-nix run .#dev > scripts/dev.sh   # Save to file
-chmod +x scripts/dev.sh
+nix run .#dev                                # Enter shell directly
+nix shell .#dev                              # Use packages directly via nix
+nix build .#dev && cp result/bin/dev dev.sh  # Save script to file
+chmod +x dev.sh
 
-nix shell .#dev                  # Use packages directly via nix
-./scripts/dev.sh                 # Use the generated script (fast, no nix eval!)
+./dev.sh                 # Use the generated script (fast, no nix eval!)
 ```
 
 ## Multiple shells
