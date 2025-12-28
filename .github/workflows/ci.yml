@@ -32,50 +32,38 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Test template builds
+      - name: Test template
         run: |
           cd templates/default
           nix flake check
-          nix build .#dev
-          nix build .#with-comment
-          nix build .#with-multiline-comment
-          nix build .#with-dangerous-comment
           nix build .#ci || true  # ci is linux-only
 
-      - name: Test script generation
-        run: |
-          cd templates/default
-          nix run .#dev > /tmp/dev.sh
+          # Test dev script
+          nix build .#dev
           echo "--- dev script ---"
-          head -20 /tmp/dev.sh
-          grep -q '#!/usr/bin/env bash' /tmp/dev.sh
-          grep -q 'jq' /tmp/dev.sh
-
-      - name: Test comment feature
-        run: |
-          cd templates/default
+          head -20 result/bin/dev
+          grep -q '#!/usr/bin/env bash' result/bin/dev
+          grep -q 'jq' result/bin/dev
 
           # Test single-line comment
-          nix run .#with-comment > /tmp/with-comment.sh
+          nix build .#with-comment
           echo "--- with-comment script ---"
-          head -10 /tmp/with-comment.sh
-          grep -q '# This is a dev environment' /tmp/with-comment.sh
+          head -10 result/bin/with-comment
+          grep -q '# This is a dev environment' result/bin/with-comment
 
           # Test multiline comment
-          nix run .#with-multiline-comment > /tmp/multiline.sh
+          nix build .#with-multiline-comment
           echo "--- multiline comment script ---"
-          head -10 /tmp/multiline.sh
-          grep -q '# Development environment' /tmp/multiline.sh
-          grep -q '# Created by quickshell' /tmp/multiline.sh
+          head -10 result/bin/with-multiline-comment
+          grep -q '# Development environment' result/bin/with-multiline-comment
+          grep -q '# Created by quickshell' result/bin/with-multiline-comment
 
           # Test dangerous characters are safely commented
-          nix run .#with-dangerous-comment > /tmp/dangerous.sh
+          nix build .#with-dangerous-comment
           echo "--- dangerous comment script ---"
-          head -10 /tmp/dangerous.sh
-          # These should appear as comments, not executed
-          grep -q '# Test: \$(whoami)' /tmp/dangerous.sh
-          grep -q "# Quotes:" /tmp/dangerous.sh
+          head -10 result/bin/with-dangerous-comment
+          grep -q '# Test: \$(whoami)' result/bin/with-dangerous-comment
+          grep -q "# Quotes:" result/bin/with-dangerous-comment
+          bash -n result/bin/with-dangerous-comment
 
-          # Verify the script is valid bash (no syntax errors)
-          bash -n /tmp/dangerous.sh
-          echo "All comment tests passed!"
+          echo "All tests passed!"
